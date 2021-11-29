@@ -1,0 +1,458 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+df1=pd.read_csv("C:/Users/user/Downloads/Python DataSet/test.csv")
+df2=pd.read_csv("C:/Users/user/Downloads/Python DataSet/train.csv")
+
+df1.head()
+
+df2.head()
+
+### Exploratory Data Analysis
+
+
+print ("shape of train dataset :", df2.shape)
+print ("shape of test dataset :", df1.shape)
+
+# train dataset info - 6 columns with text values and 22 with numeric values
+df2.info()
+
+# train dataset info - 6 columns with text values and 7 with numeric values
+df1.info()
+
+### Null Values Analysis
+
+
+df1.isnull().sum()
+
+
+df2.isnull().sum()
+
+
+#data = df1[['City','EntryStreetName','IntersectionId']].drop_duplicates()
+
+df2.Path.values
+
+### Filling Null values in street data. Since its very important 
+
+df1['EntryStreetName']=df1.EntryStreetName.fillna((df1.Path).str.split('_'))
+df1['ExitStreetName']=df1.ExitStreetName.fillna((df1.Path).str.split('_').str[-1])
+df2['EntryStreetName']=df2.EntryStreetName.fillna((df2.Path).str.split('_'))
+df2['ExitStreetName']=df2.ExitStreetName.fillna((df2.Path).str.split('_').str[-1])
+
+df1.isnull().sum()
+
+df2.isnull().sum()
+
+# Same Cities are used in Train & Test datasets
+print ("Cities in Train dataset:", df1['City'].unique().tolist())
+print ("Cities in Test dataset:", df2['City'].unique().tolist())
+
+# Number of observation per Month in Train & Test dataset - Small about of data for Jan & May and missing data for Feb-Apr
+train_months = df1.groupby('Month').size().reset_index().rename(columns={0:'train'})
+test_months = df2.groupby('Month').size().reset_index().rename(columns={0:'test'})
+
+data = train_months.merge(test_months, on='Month')
+display(data)
+sns.set_theme(style="whitegrid")
+sns.barplot(x='Month',y='value',hue='variable',data=data.melt(id_vars='Month', value_vars=['train','test']),palette=["m", "g"],color="k")
+
+# Number of observation per Hour in Train & Test dataset - Similar distrbution of data in Train & Test datasets
+train_hours = df1.groupby('Hour').size().reset_index().rename(columns={0:'train'})
+test_hours = df2.groupby('Hour').size().reset_index().rename(columns={0:'test'})
+
+data = train_hours.merge(test_hours, on='Hour')
+#display(data)
+
+sns.barplot(x='Hour',y='value',hue='variable',data=data.melt(id_vars='Hour', value_vars=['train','test']))
+
+### Descriptive Statistics of Target variables
+
+df2[['TotalTimeStopped_p20','TotalTimeStopped_p40','TotalTimeStopped_p50',
+          'TotalTimeStopped_p60','TotalTimeStopped_p80']].describe().T
+
+# Descriptive statistics of the "Time from first stop" 
+df2[['TimeFromFirstStop_p20','TimeFromFirstStop_p40', 'TimeFromFirstStop_p50','TimeFromFirstStop_p60',
+          'TimeFromFirstStop_p80']].describe().T
+# On average, time from the first stop until the vehicle passes through the intersection
+# for 80the perctile of the cars is 27 seconds
+
+# Descriptive statistics of the "•Distance to first stop" 
+df2[['DistanceToFirstStop_p20','DistanceToFirstStop_p40', 'DistanceToFirstStop_p50','DistanceToFirstStop_p60',
+ 'DistanceToFirstStop_p80']].describe().T
+# On average, the distance from the first stop until the vehicle passes through the 
+#intersection for 80the perctile of the cars is 60 'meters'
+
+import matplotlib.pyplot as plt
+
+data = df2.groupby(['City','IntersectionId','Latitude','Longitude']).agg({'TotalTimeStopped_p50':'mean'}).reset_index()
+
+fig,axes=plt.subplots(nrows=2, ncols=2, figsize=(15,10))
+for i,city in enumerate(data['City'].unique().tolist()):   
+    sns.scatterplot(x='Latitude',y='Longitude',data=data[data['City']==city],palette='twilight',hue='TotalTimeStopped_p50',ax=axes[i%2,i//2],legend=False)
+    axes[i%2,i//2].set_title(city)
+    axes[i%2,i//2].set_xlabel('Latitude')
+    axes[i%2,i//2].set_ylabel('Longitude')
+
+# Hourly Traffic per City on Weekends using 80 percentile 
+data = df2[df2['Weekend']==1].groupby(['City','Hour']).agg({'TotalTimeStopped_p80':'mean'}).reset_index()
+
+fig,axes = plt.subplots(nrows=1, ncols=data['City'].nunique(), figsize=(20,4), sharey=True)
+for i,city in enumerate(data['City'].unique()):
+    sns.barplot(data=data[data['City']==city] ,x='Hour', y='TotalTimeStopped_p80',ax=axes[i], color='C0')
+    axes[i].set_ylabel('Total time stopped ')
+    axes[i].set_title(city)
+    axes[i].set_xlabel(' hours in a day')
+    axes[i].get_xaxis().set_ticks([])
+    axes[i].spines['top'].set_visible(False)
+    axes[i].spines['right'].set_visible(False)
+plt.subplots_adjust(top=0.8)
+fig.suptitle('Hourly Traffic on Weekends')
+
+# Hourly Traffic per City on Weekdays using 80 percentile 
+data = df2[df2['Weekend']==0].groupby(['City','Hour']).agg({'TotalTimeStopped_p80':'mean'}).reset_index()
+
+fig,axes = plt.subplots(nrows=1, ncols=data['City'].nunique(), figsize=(20,4), sharey=True)
+for i,city in enumerate(data['City'].unique()):
+    sns.barplot(data=data[data['City']==city] ,x='Hour', y='TotalTimeStopped_p80',ax=axes[i], color='C0')
+    axes[i].set_ylabel('Total time stopped')
+    axes[i].set_title(city)
+    axes[i].set_xlabel('hours in a day')
+    axes[i].get_xaxis().set_ticks([])
+    axes[i].spines['top'].set_visible(False)
+    axes[i].spines['right'].set_visible(False)
+plt.subplots_adjust(top=0.8)
+fig.suptitle('Hourly Traffic on Weekdays')
+
+### Data Correlation
+
+#Train correlation - "Total Time", "Time from First Stop" & "Distance from First Stop" are all postively correlated 
+corr = df2.iloc[:,12:-1].corr()
+mask = np.triu(np.ones_like(corr,dtype=bool))
+cmap = sns.diverging_palette(250,15,s=75,l=40, n=9, center='light', as_cmap=True)
+fig = plt.figure(figsize=(12,12))
+sns.heatmap(corr, mask=mask, cmap=cmap, annot=True, fmt='.2f')
+
+### Outlier Observation Analysis
+
+# Total time stopped = the amount of time spent at 0 speed
+cols = ['TotalTimeStopped_p20','TotalTimeStopped_p40','TotalTimeStopped_p50', 
+        'TotalTimeStopped_p60', 'TotalTimeStopped_p80']
+sns.boxplot(data=df2[cols],orient='h')
+
+cols = ['TimeFromFirstStop_p20', 'TimeFromFirstStop_p40','TimeFromFirstStop_p50', 
+        'TimeFromFirstStop_p60', 'TimeFromFirstStop_p80']
+sns.boxplot(data=df2[cols],orient='h')
+
+cols = ['DistanceToFirstStop_p20', 'DistanceToFirstStop_p40', 'DistanceToFirstStop_p50',
+       'DistanceToFirstStop_p60', 'DistanceToFirstStop_p80']
+sns.boxplot(data=df2[cols],orient='h')
+
+### The data is presented in pecetiles up to 80% - Therefore, outliers for extreme traffic congestions beyond 80% already
+### been removed from data - therefore, we will not drop the outliers but we will standardization the data before modeling
+
+### Feature Engineering
+
+### Street type
+
+# creating street type
+str_code = ['Avenue','Street','Boulevard','Road','Highway','Drive','Parkway','Square','Way','Ave','St','Pkwy','Lane','Circle','Place','Other']
+str_name = ['Avenue','Street','Boulevard','Road','Highway','Drive','Parkway','Square','Way','Avenue','Street','Parkway','Lane','Circle','Place','Other']
+
+for st in range(len(str_code)):
+#     if(df2['EntryStreetName'].str.contains(str_code[st])):
+#         df2['EntryStreetType']=str_name[st]
+#     if(df2['ExitStreetName'].str.contains(str_code[st])):
+#         df2['ExitStreetType']=str_name[st]     
+    df2.loc[~(df2['EntryStreetName'].isna()) & (df2['EntryStreetName'].str.contains(str_code[st])), 'EntryStreetType'] = str_name[st]
+    df2.loc[~(df2['ExitStreetName'].isna()) & (df2['ExitStreetName'].str.contains(str_code[st])), 'ExitStreetType'] = str_name[st]
+    df1.loc[~(df1['EntryStreetName'].isna()) & (df1['EntryStreetName'].str.contains(str_code[st])), 'EntryStreetType'] = str_name[st]
+    df1.loc[~(df1['ExitStreetName'].isna()) & (df1['ExitStreetName'].str.contains(str_code[st])), 'ExitStreetType'] = str_name[st]
+    
+df2['EntryStreetType'].fillna('Other',inplace=True)
+df2['ExitStreetType'].fillna('Other',inplace=True)
+
+
+
+df1['EntryStreetType'].fillna('Other',inplace=True)
+df1['ExitStreetType'].fillna('Other',inplace=True)
+
+df2['EntryStreetType'].unique()
+
+# Number of intersection per "EntryStreetType" ---- mostly Streets and Avenues
+df2[['City','EntryStreetType','IntersectionId']].drop_duplicates().groupby('EntryStreetType',dropna=False).size().sort_values()
+
+# Averages per Street Type based on 50 & 80 percentile 
+df2.groupby('EntryStreetType').agg({'RowId':'count','TotalTimeStopped_p50':'mean','TimeFromFirstStop_p50':'mean','DistanceToFirstStop_p50':'mean','TotalTimeStopped_p80':'mean','TimeFromFirstStop_p80':'mean','DistanceToFirstStop_p80':'mean'}).rename(columns = {'RowId':'Count'}).reset_index().sort_values('TotalTimeStopped_p50', ascending=False)
+
+### number of entries and exits at particular intersection
+
+# We can create columns to identify the number of directions for each intersection
+entry_data = df2[['City','IntersectionId','EntryHeading']].drop_duplicates().groupby(['City','IntersectionId']).agg({'EntryHeading':'count'}).reset_index().rename(columns={'EntryHeading':'EntryCount'})
+exit_data = df2[['City','IntersectionId','ExitHeading']].drop_duplicates().groupby(['City','IntersectionId']).agg({'ExitHeading':'count'}).reset_index().rename(columns={'ExitHeading':'ExitCount'})
+
+# Then we add Number of Entries & Exits for each intersection
+df2 = df2.merge(entry_data, on=['City','IntersectionId'], how='left')
+df2 = df2.merge(exit_data, on=['City','IntersectionId'], how='left')
+df2.head()
+
+# Replicate for Test dataset
+entry_data = df1[['City','IntersectionId','EntryHeading']].drop_duplicates().groupby(['City','IntersectionId']).agg({'EntryHeading':'count'}).reset_index().rename(columns={'EntryHeading':'EntryCount'})
+exit_data = df1[['City','IntersectionId','ExitHeading']].drop_duplicates().groupby(['City','IntersectionId']).agg({'ExitHeading':'count'}).reset_index().rename(columns={'ExitHeading':'ExitCount'})
+
+df1 = df1.merge(entry_data, on=['City','IntersectionId'], how='left')
+df1 = df1.merge(exit_data, on=['City','IntersectionId'], how='left')
+df1.head()
+
+
+
+### Turn Type
+
+# EntryHeading & ExitHeading while keeping the sequence in order
+heading_map = {'N':1,'NE':2,'E':3,'SE':4,'S':5, 'SW':6, 'W':7, 'NW': 8}
+# df2.replace({"EntryHeading":heading_map })
+# df2.replace({"ExitHeading":heading_map })
+# df2.replace({"EntryHeading":heading_map })
+# df2.replace({"ExitHeading":heading_map })
+df1['EntryHeading']=df1['EntryHeading'].astype('str')
+df2['EntryHeading']=df2['EntryHeading'].astype('str')
+
+df1['ExitHeading']=df1['ExitHeading'].astype('str')
+df2['ExitHeading']=df2['ExitHeading'].astype('str')
+df2['EntryHeading'] = df2['EntryHeading'].map(heading_map)
+df2['ExitHeading'] = df2['ExitHeading'].map(heading_map)
+df1['EntryHeading'] = df1['EntryHeading'].map(heading_map)
+df1['ExitHeading'] = df1['ExitHeading'].map(heading_map)
+# df2['EntryHeading'] = df2.EntryHeading.replace(heading_map)
+# df2['ExitHeading'] = df2.ExitHeading.replace(heading_map)
+# df1['EntryHeading'] = df1.EntryHeading.replace(heading_map)
+# df1['ExitHeading'] = df1.ExitHeading.replace(heading_map)
+# for e,i in enumerate(df1['ExitHeading'].tolist()):
+#     if i in heading_map.keys():
+#         df1['ExitHeading'][e]=heading_map[i]
+
+#df1.apply(lambda col: col for col in heading_map)#(lambda elem:heading_map.get(elem, elem)))
+#df2['EntryHeading'] = df2.apply(lambda row: multiple_replace(heading_map, row['EntryHeading']), axis=1)
+df1.head()
+
+# Turn Type - difference between Exit & Entry
+df2['TurnType'] = df2['ExitHeading'] - df2['EntryHeading']
+df1['TurnType'] = df1['ExitHeading'] - df1['EntryHeading']
+df2.head()
+
+
+# Averages per 'EntryExitDiff' based on 50 & 80 percentile 
+df2.groupby('TurnType').agg({'RowId':'count','TotalTimeStopped_p50':'mean','TimeFromFirstStop_p50':'mean','DistanceToFirstStop_p50':'mean','TotalTimeStopped_p80':'mean','TimeFromFirstStop_p80':'mean','DistanceToFirstStop_p80':'mean'}).rename(columns = {'RowId':'Count'}).reset_index().sort_values('TotalTimeStopped_p50', ascending=False)
+
+### Distance from City Centre
+
+##### City Centers are busier than country sides. Distance to City Center is culculated using Latitude and Longitude
+
+from sklearn.neighbors import DistanceMetric
+
+def calc_distance(row):#(lat1, lon1, lat2, lon2):
+    R = 6373.0
+    lat1 = row['CCLatitude']
+    lon1 = row['CCLongitude']
+    lat2 = row['Latitude']
+    lon2 = row['Longitude']
+    dist = DistanceMetric.get_metric('haversine')
+    X = [[np.radians(lat1), np.radians(lon1)], [np.radians(lat2), np.radians(lon2)]]
+    distance = np.abs(np.array(R * dist.pairwise(X)).item(1))
+    return distance
+
+cities = ['Atlanta', 'Boston', 'Chicago', 'Philadelphia']
+cc_lat = [33.753746, 42.361145,41.881832,39.952583]
+cc_lon = [-84.386330,-71.057083,-87.623177,-75.165222]
+
+for c in range(len(cities)):
+    df2.loc[df2['City']==cities[c], 'CCLatitude'] = cc_lat[c]
+    df2.loc[df2['City']==cities[c], 'CCLongitude'] = cc_lon[c]
+    df1.loc[df1['City']==cities[c], 'CCLatitude'] = cc_lat[c]
+    df1.loc[df1['City']==cities[c], 'CCLongitude'] = cc_lon[c]
+    
+    
+df2['CCDist'] = df2.apply(calc_distance, axis=1)
+df1['CCDist'] = df1.apply(calc_distance, axis=1)
+df2.head()
+
+### Rainfall and Temperature
+
+###### Monthly weather including temperature & rain can affect congestion. This can also help generalize the model for the missing months
+
+temp = [['Chicago',-4.6,-2.4,3.2,9.4,15.1,20.5,23.3,22.4,18.1,11.4,4.6,-2.3],
+['Boston',-1.5,0,3,9,14.5,19.5,23,22,18,12,7,1.5],
+['Atlanta',6.6,8.7,12.6,16.8,21.4,25.3,26.8,26.3,23.2,17.6,12.5,7.7],
+['Philadelphia',0.5,2.1,6.4,12.2,17.7,23,25.6,24.8,20.6,14.2,8.6,3]]
+
+rain = [['Chicago',45,45,65,85,95,90,95,125,80,80,80,55],
+['Boston',85,85,110,95,90,95,85,85,85,100,100,95],
+['Atlanta',105,120,120,85,95,100,135,100,115,85,105,100],
+['Philadelphia',75,65,95,90,95,85,110,90,95,80,75,90]]
+
+columns = ['City'] + np.linspace(1,12,12,dtype=int).tolist()
+
+df_temp = pd.DataFrame(temp, columns = columns).set_index('City').unstack().reset_index()
+df_temp.columns = ['Month','City','Temperature']
+
+df_rain = pd.DataFrame(rain, columns = columns).set_index('City').unstack().reset_index()
+df_rain.columns = ['Month','City','Rainfall']
+
+df2 = df2.merge(df_temp, on=['Month','City'])
+df2 = df2.merge(df_rain, on=['Month','City'])
+
+df1 = df1.merge(df_temp, on=['Month','City'])
+df1 = df1.merge(df_rain, on=['Month','City'])
+df2.head()
+
+### Data Scaling
+
+# The given data follows regression. Some features in the data are in string format.we are coverting them into numericals using dummies
+
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score, KFold, RepeatedKFold
+from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.multioutput import MultiOutputRegressor, RegressorChain
+
+# features to be used in modeling 
+features = ['Hour', 'Weekend','EntryStreetType', 'ExitStreetType', 'EntryCount', 
+            'ExitCount','TurnType', 'CCDist','Temperature','Rainfall','City']
+
+df2_train = df2[features]
+df1_test = df1[features]
+
+# encoding city name
+
+city_encoder = LabelEncoder().fit(cities)
+df2_train.loc[:,'City'] = city_encoder.transform(df2_train['City'])
+df1_test.loc[:,'City'] = city_encoder.transform(df1_test['City'])
+
+# encoding street type
+StreetType = np.unique(df2_train['EntryStreetType'].unique().tolist() + df1_test['ExitStreetType'].unique().tolist()) 
+street_encoder = LabelEncoder().fit(StreetType)
+df2_train.loc[:,'EntryStreetType'] = street_encoder.transform(df2_train['EntryStreetType'])
+df2_train.loc[:,'ExitStreetType'] = street_encoder.transform(df2_train['ExitStreetType'])
+df1_test.loc[:,'EntryStreetType'] = street_encoder.transform(df1_test['EntryStreetType'])
+df1_test.loc[:,'ExitStreetType'] = street_encoder.transform(df1_test['ExitStreetType'])
+
+df2.head()
+
+df2.City.unique()
+
+### Normalization
+
+#We can improve the performance of the models by standardization. 
+df1['EntryStreetType'].dtype
+
+
+
+# df1_test['EntryStreetType']=df1_test['EntryStreetType'].astype('float')
+# df2_train['EntryStreetType']=df2_train['EntryStreetType'].astype('float')
+
+# df1_test['ExitStreetType']=df1_test['ExitStreetType'].astype('float')
+# df2_train['ExitStreetType']=df2_train['ExitStreetType'].astype('float')
+scaler = StandardScaler().fit(df2_train)
+df_train_scaled = scaler.transform(df2_train)
+df_test_scaled = scaler.transform(df1_test)
+
+### PCA
+
+##### Principal Component Analysis, or PCA, is a dimensionality-reduction method that is often used to reduce the dimensionality of large data sets, by transforming a large set of variables into a smaller one that still contains most of the information in the large set.
+
+pca = PCA()
+pca.fit_transform(df_train_scaled)
+features = range(pca.n_components_)
+plt.bar(features, pca.explained_variance_)
+plt.ylabel('variance explained')
+plt.xlabel('PCA feature')
+
+print ("Number of components with explained variance ratio >= 0.05 :", (pca.explained_variance_ratio_>=0.05).sum())
+print (f"Total explained variance retained : {pca.explained_variance_ratio_[:np.sum(pca.explained_variance_ratio_>=.01)].sum():2.4f}")
+
+# create a pca dataframe based on 90% explained variance retained 
+pca = PCA(n_components=.90).fit(df_train_scaled)
+pca_train = pca.transform(df_train_scaled)
+pca_test = pca.transform(df_test_scaled)
+col_lst = []
+for i in range(0,pca_train.shape[1]):
+    col_lst.append(f'PC{i}')
+    
+df_pca_train = pd.DataFrame(pca_train,columns=col_lst)
+df_pca_test = pd.DataFrame(pca_test,columns=col_lst)
+df_pca_train.head()
+
+### Models
+
+##### Since this is a supervised regression problem, we will use regression models  Linear Regression, K-Nearest-Neighbour, Decision Tree, Random Forest  and comapare the results.
+
+##### We will use Root Mean Squared Error (rmse) as a criteria to evaluate the performance of each model.
+
+# Trying both the scaled & PCA data to see if we can maintain good accuracy level with less features
+X = df_train_scaled 
+X_pca = df_pca_train
+y = df2[['TotalTimeStopped_p20','TotalTimeStopped_p50','TotalTimeStopped_p80',
+     'DistanceToFirstStop_p20','DistanceToFirstStop_p50','DistanceToFirstStop_p80']]
+
+# split the data into train and test 
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+X_train_pca, X_test_pca, y_train_pca, y_test_pca = train_test_split(X_pca, y, test_size=0.3, random_state=42)
+
+# Create function to run different models and return rmse
+def modeling(X_train, X_test, y_train, y_test):
+    models = []
+    models.append(('LR', LinearRegression()))
+    models.append(('KNN', KNeighborsRegressor()))
+    models.append(('DT', DecisionTreeRegressor(random_state = 1)))
+    models.append(('RF', RandomForestRegressor(random_state = 1)))
+    models.append(('GB', MultiOutputRegressor(GradientBoostingRegressor(random_state = 1))))
+
+    #Evaluate each model in turn
+    names = []
+    rmses = []
+    
+    for name, model in models:
+        model.fit (X_train, y_train)
+        y_pred = model.predict(X_test)
+        mse = mean_squared_error (y_test, y_pred)
+        rmse = np.sqrt(mse)
+        
+        print (f'{name} : mse {mse} - rmse {rmse}')
+        names.append(name)
+        rmses.append(rmse)
+    return names, rmses
+
+# run modeling function on scaled data
+print ("Scaled Data Modeling :")
+names, rmses = modeling (X_train, X_test, y_train, y_test)
+
+# run modeling function on pca data
+print ("PCA Data Modeling :")
+pca_names, pca_rmses = modeling (X_train_pca, X_test_pca, y_train_pca, y_test_pca)
+
+###### Best rmse result was obtained when we ran RF on scaled data.
+
+##### In general, modeling scaled data performed better that PCA data since we use didn't try to reduce dimesionality of the data. Yet the gap in the different models vary as we see in the LR the gap in rmse is very minimum while it's quiet high in the DT model
+
+### Report
+
+The aim of this study was to create regression models to predict traffic congestion in 4 major cities in th US. The work done is as follows:
+
+1) Train & Test Data Set read.
+
+2) With Exploratory Data Analysis; The data set's structural data were checked. The types of variables in the dataset were examined. Size information of the dataset was accessed. There are missing values in the data set but that doesn't affect the modeling. Descriptive statistics of the data set were examined.
+
+3) Data Preprocessing section; The outliers were determined and X variables were standardized with the rubost method..
+
+4) During Model Building; Linear Regression, KNN, Decision Tree, Random Forest and gradient boosting machine learning models were calculated.
+
+5) Result; The model created as a result of Random Forest became the model with the lowest RMSE value.
